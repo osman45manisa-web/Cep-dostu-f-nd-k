@@ -12,7 +12,9 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -29,163 +31,67 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        prefs = getSharedPreferences(
-                "findik_settings",
-                MODE_PRIVATE
-        );
+        prefs = getSharedPreferences("findik_settings", MODE_PRIVATE);
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(true);
+        scrollView.setBackgroundColor(background);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(
-                dp(24),
-                dp(45),
-                dp(24),
-                dp(30)
-        );
-        root.setBackgroundColor(background);
+        root.setPadding(dp(24), dp(40), dp(24), dp(35));
 
         TextView title = new TextView(this);
         title.setText("Cep Dostu Fındık");
         title.setTextSize(30);
-        title.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setTextColor(brown);
         title.setGravity(Gravity.CENTER);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText(
-                "Fındık telefon ekranında seninle dolaşsın."
-        );
+        subtitle.setText("Fındık telefonunda seninle yaşasın.");
         subtitle.setTextSize(15);
         subtitle.setTextColor(lightBrown);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(
-                0,
-                dp(8),
-                0,
-                dp(30)
-        );
+        subtitle.setPadding(0, dp(8), 0, dp(25));
 
-        LinearLayout statusCard =
-                new LinearLayout(this);
+        LinearLayout statusCard = createCard();
 
-        statusCard.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        statusCard.setPadding(
-                dp(20),
-                dp(18),
-                dp(20),
-                dp(18)
-        );
-
-        GradientDrawable cardBackground =
-                new GradientDrawable();
-
-        cardBackground.setColor(Color.WHITE);
-        cardBackground.setCornerRadius(dp(22));
-
-        statusCard.setBackground(cardBackground);
-
-        TextView statusTitle =
-                new TextView(this);
-
-        statusTitle.setText("Fındık");
+        TextView statusTitle = new TextView(this);
+        statusTitle.setText("Fındık'ın durumu");
         statusTitle.setTextSize(17);
-        statusTitle.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
+        statusTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         statusTitle.setTextColor(brown);
 
-        TextView statusText =
-                new TextView(this);
-
+        TextView statusText = new TextView(this);
         statusText.setText("● Dinleniyor");
         statusText.setTextSize(15);
         statusText.setTextColor(lightBrown);
-        statusText.setPadding(
-                0,
-                dp(6),
-                0,
-                0
-        );
+        statusText.setPadding(0, dp(7), 0, 0);
 
         statusCard.addView(statusTitle);
         statusCard.addView(statusText);
 
-        LinearLayout.LayoutParams cardParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
-
-        cardParams.setMargins(
-                0,
-                0,
-                0,
-                dp(25)
-        );
-
-        statusCard.setLayoutParams(cardParams);
-
-        TextView sizeTitle =
-                new TextView(this);
-
-        sizeTitle.setText("Fındık'ın boyutu");
-        sizeTitle.setTextSize(17);
-        sizeTitle.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-        sizeTitle.setTextColor(brown);
-
-        TextView sizeValue =
-                new TextView(this);
-
-        int savedSize =
-                prefs.getInt(
-                        "pet_size",
-                        520
-                );
-
-        sizeValue.setText(
-                savedSize + " px"
-        );
-
-        sizeValue.setTextSize(14);
-        sizeValue.setTextColor(lightBrown);
-        sizeValue.setPadding(
-                0,
-                dp(5),
-                0,
-                dp(8)
-        );
-
-        SeekBar sizeSeek =
-                new SeekBar(this);
+        root.addView(title);
+        root.addView(subtitle);
+        root.addView(statusCard);
 
         /*
-         * 350 - 750 px arası
+         * BOYUT
          */
+
+        TextView sizeTitle = sectionTitle("Fındık'ın boyutu");
+        root.addView(sizeTitle);
+
+        int savedSize = prefs.getInt("pet_size", 520);
+
+        TextView sizeValue = valueText(savedSize + " px");
+        root.addView(sizeValue);
+
+        SeekBar sizeSeek = new SeekBar(this);
         sizeSeek.setMax(400);
-
-        int initialProgress =
-                savedSize - 350;
-
-        if (initialProgress < 0) {
-            initialProgress = 0;
-        }
-
-        if (initialProgress > 400) {
-            initialProgress = 400;
-        }
-
         sizeSeek.setProgress(
-                initialProgress
+                Math.max(0, Math.min(400, savedSize - 350))
         );
 
         sizeSeek.setOnSeekBarChangeListener(
@@ -197,20 +103,165 @@ public class MainActivity extends Activity {
                             int progress,
                             boolean fromUser
                     ) {
+                        int size = 350 + progress;
 
-                        int newSize =
-                                350 + progress;
+                        sizeValue.setText(size + " px");
 
-                        sizeValue.setText(
-                                newSize + " px"
+                        prefs.edit()
+                                .putInt("pet_size", size)
+                                .apply();
+                    }
+
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {
+                    }
+
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {
+                    }
+                }
+        );
+
+        root.addView(sizeSeek);
+
+        TextView sizeHint = hintText(
+                "Küçük                               Büyük"
+        );
+
+        root.addView(sizeHint);
+
+        /*
+         * YÜRÜME HIZI
+         */
+
+        TextView speedTitle = sectionTitle("Yürüme hızı");
+        root.addView(speedTitle);
+
+        int savedSpeed = prefs.getInt("walk_speed", 50);
+
+        TextView speedValue = valueText(
+                speedName(savedSpeed)
+        );
+
+        root.addView(speedValue);
+
+        SeekBar speedSeek = new SeekBar(this);
+        speedSeek.setMax(100);
+        speedSeek.setProgress(savedSpeed);
+
+        speedSeek.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+
+                    @Override
+                    public void onProgressChanged(
+                            SeekBar seekBar,
+                            int progress,
+                            boolean fromUser
+                    ) {
+
+                        prefs.edit()
+                                .putInt("walk_speed", progress)
+                                .apply();
+
+                        speedValue.setText(
+                                speedName(progress)
                         );
+                    }
+
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {
+                    }
+
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {
+                    }
+                }
+        );
+
+        root.addView(speedSeek);
+
+        TextView speedHint = hintText(
+                "Yavaş                                  Hızlı"
+        );
+
+        root.addView(speedHint);
+
+        /*
+         * SES
+         */
+
+        TextView soundTitle = sectionTitle("Sesler");
+        root.addView(soundTitle);
+
+        CheckBox soundEnabled = new CheckBox(this);
+
+        soundEnabled.setText("Fındık'ın sesleri açık");
+        soundEnabled.setTextSize(16);
+        soundEnabled.setTextColor(brown);
+
+        boolean soundOn =
+                prefs.getBoolean(
+                        "sound_enabled",
+                        true
+                );
+
+        soundEnabled.setChecked(soundOn);
+
+        soundEnabled.setOnCheckedChangeListener(
+                (buttonView, isChecked) -> {
+
+                    prefs.edit()
+                            .putBoolean(
+                                    "sound_enabled",
+                                    isChecked
+                            )
+                            .apply();
+                }
+        );
+
+        root.addView(soundEnabled);
+
+        int savedVolume =
+                prefs.getInt(
+                        "sound_volume",
+                        80
+                );
+
+        TextView volumeValue =
+                valueText(
+                        "Ses seviyesi: %" +
+                                savedVolume
+                );
+
+        root.addView(volumeValue);
+
+        SeekBar volumeSeek =
+                new SeekBar(this);
+
+        volumeSeek.setMax(100);
+        volumeSeek.setProgress(savedVolume);
+
+        volumeSeek.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+
+                    @Override
+                    public void onProgressChanged(
+                            SeekBar seekBar,
+                            int progress,
+                            boolean fromUser
+                    ) {
 
                         prefs.edit()
                                 .putInt(
-                                        "pet_size",
-                                        newSize
+                                        "sound_volume",
+                                        progress
                                 )
                                 .apply();
+
+                        volumeValue.setText(
+                                "Ses seviyesi: %" +
+                                        progress
+                        );
                     }
 
                     @Override
@@ -223,80 +274,29 @@ public class MainActivity extends Activity {
                     public void onStopTrackingTouch(
                             SeekBar seekBar
                     ) {
-
-                        /*
-                         * Fındık açıksa yeni boyutu
-                         * uygulamak için servisi
-                         * yeniden başlatıyoruz.
-                         */
-
-                        stopService(
-                                new Intent(
-                                        MainActivity.this,
-                                        PetService.class
-                                )
-                        );
-
-                        if (Settings.canDrawOverlays(
-                                MainActivity.this
-                        )) {
-
-                            startForegroundService(
-                                    new Intent(
-                                            MainActivity.this,
-                                            PetService.class
-                                    )
-                            );
-
-                            statusText.setText(
-                                    "● Ekranda seninle"
-                            );
-
-                            statusText.setTextColor(
-                                    green
-                            );
-                        }
                     }
                 }
         );
 
-        TextView smallLarge =
-                new TextView(this);
+        root.addView(volumeSeek);
 
-        smallLarge.setText(
-                "Küçük                              Büyük"
-        );
+        /*
+         * BUTONLAR
+         */
 
-        smallLarge.setTextSize(12);
-        smallLarge.setTextColor(lightBrown);
-        smallLarge.setGravity(Gravity.CENTER);
-        smallLarge.setPadding(
-                0,
-                0,
-                0,
-                dp(25)
-        );
-
-        Button startButton =
-                new Button(this);
-
-        startButton.setText(
-                "Fındık'ı Ekrana Getir"
-        );
-
+        Button startButton = new Button(this);
+        startButton.setText("Fındık'ı Ekrana Getir");
         startButton.setTextSize(17);
         startButton.setTextColor(Color.WHITE);
         startButton.setAllCaps(false);
 
-        GradientDrawable startBackground =
+        GradientDrawable startBg =
                 new GradientDrawable();
 
-        startBackground.setColor(brown);
-        startBackground.setCornerRadius(dp(18));
+        startBg.setColor(brown);
+        startBg.setCornerRadius(dp(18));
 
-        startButton.setBackground(
-                startBackground
-        );
+        startButton.setBackground(startBg);
 
         LinearLayout.LayoutParams startParams =
                 new LinearLayout.LayoutParams(
@@ -306,75 +306,36 @@ public class MainActivity extends Activity {
 
         startParams.setMargins(
                 0,
-                0,
+                dp(25),
                 0,
                 dp(12)
         );
 
-        startButton.setLayoutParams(
-                startParams
-        );
+        startButton.setLayoutParams(startParams);
 
-        Button stopButton =
-                new Button(this);
-
-        stopButton.setText(
-                "Fındık'ı Dinlendir"
-        );
-
+        Button stopButton = new Button(this);
+        stopButton.setText("Fındık'ı Dinlendir");
         stopButton.setTextSize(16);
         stopButton.setTextColor(brown);
         stopButton.setAllCaps(false);
 
-        GradientDrawable stopBackground =
+        GradientDrawable stopBg =
                 new GradientDrawable();
 
-        stopBackground.setColor(
-                Color.TRANSPARENT
-        );
-
-        stopBackground.setStroke(
+        stopBg.setColor(Color.TRANSPARENT);
+        stopBg.setStroke(
                 dp(2),
-                Color.rgb(
-                        210,
-                        190,
-                        175
-                )
+                Color.rgb(210, 190, 175)
         );
+        stopBg.setCornerRadius(dp(18));
 
-        stopBackground.setCornerRadius(
-                dp(18)
-        );
-
-        stopButton.setBackground(
-                stopBackground
-        );
+        stopButton.setBackground(stopBg);
 
         stopButton.setLayoutParams(
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         dp(56)
                 )
-        );
-
-        TextView help =
-                new TextView(this);
-
-        help.setText(
-                "Dokun: tepki verir\n" +
-                "Uzun bas: havlar\n" +
-                "Sürükle: istediğin yere taşı"
-        );
-
-        help.setGravity(Gravity.CENTER);
-        help.setTextSize(14);
-        help.setTextColor(lightBrown);
-
-        help.setPadding(
-                dp(10),
-                dp(28),
-                dp(10),
-                0
         );
 
         startButton.setOnClickListener(v -> {
@@ -428,25 +389,150 @@ public class MainActivity extends Activity {
                     "● Dinleniyor"
             );
 
-            statusText.setTextColor(
-                    lightBrown
-            );
+            statusText.setTextColor(lightBrown);
         });
-
-        root.addView(title);
-        root.addView(subtitle);
-        root.addView(statusCard);
-
-        root.addView(sizeTitle);
-        root.addView(sizeValue);
-        root.addView(sizeSeek);
-        root.addView(smallLarge);
 
         root.addView(startButton);
         root.addView(stopButton);
-        root.addView(help);
 
-        setContentView(root);
+        TextView info = new TextView(this);
+
+        info.setText(
+                "Dokun → Tepki verir\n" +
+                "Uzun bas → Havlar\n" +
+                "Sürükle → Yerini değiştir"
+        );
+
+        info.setTextSize(14);
+        info.setTextColor(lightBrown);
+        info.setGravity(Gravity.CENTER);
+        info.setPadding(
+                0,
+                dp(25),
+                0,
+                dp(20)
+        );
+
+        root.addView(info);
+
+        scrollView.addView(root);
+
+        setContentView(scrollView);
+    }
+
+    private LinearLayout createCard() {
+
+        LinearLayout card =
+                new LinearLayout(this);
+
+        card.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        card.setPadding(
+                dp(20),
+                dp(18),
+                dp(20),
+                dp(18)
+        );
+
+        GradientDrawable bg =
+                new GradientDrawable();
+
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dp(20));
+
+        card.setBackground(bg);
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+
+        params.setMargins(
+                0,
+                0,
+                0,
+                dp(25)
+        );
+
+        card.setLayoutParams(params);
+
+        return card;
+    }
+
+    private TextView sectionTitle(String text) {
+
+        TextView view = new TextView(this);
+
+        view.setText(text);
+        view.setTextSize(17);
+        view.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+        view.setTextColor(brown);
+
+        view.setPadding(
+                0,
+                dp(18),
+                0,
+                dp(4)
+        );
+
+        return view;
+    }
+
+    private TextView valueText(String text) {
+
+        TextView view = new TextView(this);
+
+        view.setText(text);
+        view.setTextSize(14);
+        view.setTextColor(lightBrown);
+
+        return view;
+    }
+
+    private TextView hintText(String text) {
+
+        TextView view = new TextView(this);
+
+        view.setText(text);
+        view.setTextSize(12);
+        view.setTextColor(lightBrown);
+        view.setGravity(Gravity.CENTER);
+
+        view.setPadding(
+                0,
+                0,
+                0,
+                dp(10)
+        );
+
+        return view;
+    }
+
+    private String speedName(int value) {
+
+        if (value < 25) {
+            return "Çok yavaş";
+        }
+
+        if (value < 45) {
+            return "Yavaş";
+        }
+
+        if (value < 65) {
+            return "Normal";
+        }
+
+        if (value < 85) {
+            return "Hızlı";
+        }
+
+        return "Çok hızlı";
     }
 
     private int dp(int value) {
