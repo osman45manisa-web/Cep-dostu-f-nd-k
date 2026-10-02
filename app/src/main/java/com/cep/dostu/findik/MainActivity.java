@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
         );
 
         /*
-         * FINDIK GÖRSELİ
+         * FINDIK ÖNİZLEME
          */
 
         PetPreviewView preview =
@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams previewParams =
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        dp(250)
+                        dp(230)
                 );
 
         previewParams.setMargins(
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         preview.setLayoutParams(previewParams);
 
         /*
-         * DURUM KARTI
+         * DURUM
          */
 
         LinearLayout statusCard =
@@ -164,6 +164,7 @@ public class MainActivity extends Activity {
 
         /*
          * BOYUT
+         * 220 - 550 px
          */
 
         TextView sizeTitle =
@@ -176,12 +177,22 @@ public class MainActivity extends Activity {
         int savedSize =
                 prefs.getInt(
                         "pet_size",
-                        520
+                        340
                 );
+
+        if (savedSize < 220) {
+            savedSize = 220;
+        }
+
+        if (savedSize > 550) {
+            savedSize = 550;
+        }
+
+        final int initialSize = savedSize;
 
         TextView sizeValue =
                 valueText(
-                        savedSize + " px"
+                        initialSize + " px"
                 );
 
         root.addView(sizeValue);
@@ -189,16 +200,13 @@ public class MainActivity extends Activity {
         SeekBar sizeSeek =
                 new SeekBar(this);
 
-        sizeSeek.setMax(400);
+        /*
+         * 220 + 330 = 550
+         */
+        sizeSeek.setMax(330);
 
         sizeSeek.setProgress(
-                Math.max(
-                        0,
-                        Math.min(
-                                400,
-                                savedSize - 350
-                        )
-                )
+                initialSize - 220
         );
 
         sizeSeek.setOnSeekBarChangeListener(
@@ -212,7 +220,7 @@ public class MainActivity extends Activity {
                     ) {
 
                         int size =
-                                350 + progress;
+                                220 + progress;
 
                         sizeValue.setText(
                                 size + " px"
@@ -561,6 +569,10 @@ public class MainActivity extends Activity {
         root.addView(startButton);
         root.addView(stopButton);
 
+        /*
+         * KULLANIM BİLGİSİ
+         */
+
         TextView info =
                 new TextView(this);
 
@@ -722,12 +734,12 @@ public class MainActivity extends Activity {
     }
 
     /*
-     * ANA EKRANDA FINDIK ÖNİZLEMESİ
+     * FINDIK ÖNİZLEMESİ
      */
 
     private static class PetPreviewView extends View {
 
-        private Bitmap sprite;
+        private final Bitmap sprite;
 
         private final Paint paint =
                 new Paint(
@@ -756,18 +768,11 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            int frameCount = 6;
-
             int frameWidth =
-                    sprite.getWidth() /
-                            frameCount;
+                    sprite.getWidth() / 6;
 
             int frameHeight =
                     sprite.getHeight();
-
-            /*
-             * Idle sprite'ın ilk karesini göster.
-             */
 
             Rect source =
                     new Rect(
@@ -810,8 +815,10 @@ public class MainActivity extends Activity {
                     new Rect(
                             left,
                             top,
-                            left + drawWidth,
-                            top + drawHeight
+                            left +
+                                    drawWidth,
+                            top +
+                                    drawHeight
                     );
 
             canvas.drawBitmap(
