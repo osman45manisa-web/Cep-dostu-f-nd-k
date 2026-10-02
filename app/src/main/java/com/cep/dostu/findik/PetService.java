@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
@@ -40,31 +41,62 @@ public class PetService extends Service {
             return;
         }
 
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        SharedPreferences prefs =
+                getSharedPreferences(
+                        "findik_settings",
+                        MODE_PRIVATE
+                );
 
-        petView = new PetView(this);
+        int petSize =
+                prefs.getInt(
+                        "pet_size",
+                        520
+                );
+
+        windowManager =
+                (WindowManager)
+                        getSystemService(
+                                WINDOW_SERVICE
+                        );
+
+        petView =
+                new PetView(this);
 
         WindowManager.LayoutParams params =
                 new WindowManager.LayoutParams(
-                        420,
-                        420,
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                        petSize,
+                        petSize,
+                        Build.VERSION.SDK_INT >=
+                                Build.VERSION_CODES.O
                                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                                 : WindowManager.LayoutParams.TYPE_PHONE,
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                         PixelFormat.TRANSLUCENT
                 );
 
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.x = 80;
+        params.gravity =
+                Gravity.TOP |
+                        Gravity.START;
+
+        params.x = 60;
         params.y = 500;
 
-        windowManager.addView(petView, params);
-        petView.setWindowManager(windowManager, params);
+        windowManager.addView(
+                petView,
+                params
+        );
+
+        petView.setWindowManager(
+                windowManager,
+                params
+        );
     }
 
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.O) {
+
             NotificationChannel channel =
                     new NotificationChannel(
                             CHANNEL_ID,
@@ -73,10 +105,14 @@ public class PetService extends Service {
                     );
 
             NotificationManager manager =
-                    getSystemService(NotificationManager.class);
+                    getSystemService(
+                            NotificationManager.class
+                    );
 
             if (manager != null) {
-                manager.createNotificationChannel(channel);
+                manager.createNotificationChannel(
+                        channel
+                );
             }
         }
     }
@@ -85,13 +121,22 @@ public class PetService extends Service {
     public void onDestroy() {
         super.onDestroy();
 
-        if (windowManager != null && petView != null) {
-            windowManager.removeView(petView);
+        if (windowManager != null &&
+                petView != null) {
+
+            try {
+                windowManager.removeView(
+                        petView
+                );
+            } catch (Exception ignored) {
+            }
         }
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
+    public IBinder onBind(
+            Intent intent
+    ) {
         return null;
     }
 }
