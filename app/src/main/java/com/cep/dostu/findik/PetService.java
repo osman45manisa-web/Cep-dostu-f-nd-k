@@ -13,13 +13,16 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.WindowManager;
 
-public class PetService extends Service {
+public class PetService extends Service
+        implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String CHANNEL_ID = "findik_channel";
     private static final int NOTIFICATION_ID = 101;
 
     private WindowManager windowManager;
     private PetView petView;
+    private WindowManager.LayoutParams params;
+    private SharedPreferences prefs;
 
     @Override
     public void onCreate() {
@@ -34,18 +37,22 @@ public class PetService extends Service {
                         .setSmallIcon(android.R.drawable.ic_menu_myplaces)
                         .build();
 
-        startForeground(NOTIFICATION_ID, notification);
+        startForeground(
+                NOTIFICATION_ID,
+                notification
+        );
 
         if (!Settings.canDrawOverlays(this)) {
             stopSelf();
             return;
         }
 
-        SharedPreferences prefs =
-                getSharedPreferences(
-                        "findik_settings",
-                        MODE_PRIVATE
-                );
+        prefs = getSharedPreferences(
+                "findik_settings",
+                MODE_PRIVATE
+        );
+
+        prefs.registerOnSharedPreferenceChangeListener(this);
 
         int petSize =
                 prefs.getInt(
@@ -62,7 +69,7 @@ public class PetService extends Service {
         petView =
                 new PetView(this);
 
-        WindowManager.LayoutParams params =
+        params =
                 new WindowManager.LayoutParams(
                         petSize,
                         petSize,
@@ -90,6 +97,38 @@ public class PetService extends Service {
                 windowManager,
                 params
         );
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(
+            SharedPreferences sharedPreferences,
+            String key
+    ) {
+
+        if ("pet_size".equals(key)) {
+
+            int newSize =
+                    sharedPreferences.getInt(
+                            "pet_size",
+                            520
+                    );
+
+            if (params != null &&
+                    windowManager != null &&
+                    petView != null) {
+
+                params.width = newSize;
+                params.height = newSize;
+
+                try {
+                    windowManager.updateViewLayout(
+                            petView,
+                            params
+                    );
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     private void createNotificationChannel() {
@@ -120,6 +159,10 @@ public class PetService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+
+        if (prefs != null) {
+            prefs.unregisterOnSharedPreferenceChangeListener(this);
+        }
 
         if (windowManager != null &&
                 petView != null) {
