@@ -57,8 +57,23 @@ public class PetService extends Service
         int petSize =
                 prefs.getInt(
                         "pet_size",
-                        340
+                        480
                 );
+
+        /*
+         * Önceki sürümden 340 gibi
+         * çok küçük değer kaldıysa düzelt.
+         */
+        if (petSize < 400) {
+            petSize = 480;
+
+            prefs.edit()
+                    .putInt(
+                            "pet_size",
+                            petSize
+                    )
+                    .apply();
+        }
 
         windowManager =
                 (WindowManager)
@@ -71,13 +86,10 @@ public class PetService extends Service
 
         int width = petSize;
 
-        /*
-         * Kare pencere yerine
-         * biraz daha yatay ve kısa pencere.
-         * Böylece şeffaf boş alan azalır.
-         */
         int height =
-                (int) (petSize * 0.72f);
+                (int) (
+                        petSize * 0.80f
+                );
 
         params =
                 new WindowManager.LayoutParams(
@@ -95,8 +107,8 @@ public class PetService extends Service
                 Gravity.TOP |
                         Gravity.START;
 
-        params.x = 40;
-        params.y = 550;
+        params.x = 20;
+        params.y = 500;
 
         windowManager.addView(
                 petView,
@@ -120,29 +132,44 @@ public class PetService extends Service
             int newSize =
                     sharedPreferences.getInt(
                             "pet_size",
-                            340
+                            480
                     );
+
+            /*
+             * Çok küçük olmasına izin verme.
+             */
+            if (newSize < 400) {
+                newSize = 400;
+            }
 
             if (params != null &&
                     windowManager != null &&
                     petView != null) {
 
-                params.width =
-                        newSize;
+                /*
+                 * Hareket yapmıyorsa
+                 * normal boyuta geçir.
+                 */
+                if (!petView.isReacting()) {
 
-                params.height =
-                        (int) (
-                                newSize * 0.72f
+                    params.width =
+                            newSize;
+
+                    params.height =
+                            (int) (
+                                    newSize *
+                                            0.80f
+                            );
+
+                    try {
+
+                        windowManager.updateViewLayout(
+                                petView,
+                                params
                         );
 
-                try {
-
-                    windowManager.updateViewLayout(
-                            petView,
-                            params
-                    );
-
-                } catch (Exception ignored) {
+                    } catch (Exception ignored) {
+                    }
                 }
             }
         }
