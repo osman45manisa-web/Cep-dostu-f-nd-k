@@ -57,7 +57,7 @@ public class PetService extends Service
         int petSize =
                 prefs.getInt(
                         "pet_size",
-                        520
+                        340
                 );
 
         windowManager =
@@ -69,10 +69,20 @@ public class PetService extends Service
         petView =
                 new PetView(this);
 
+        int width = petSize;
+
+        /*
+         * Kare pencere yerine
+         * biraz daha yatay ve kısa pencere.
+         * Böylece şeffaf boş alan azalır.
+         */
+        int height =
+                (int) (petSize * 0.72f);
+
         params =
                 new WindowManager.LayoutParams(
-                        petSize,
-                        petSize,
+                        width,
+                        height,
                         Build.VERSION.SDK_INT >=
                                 Build.VERSION_CODES.O
                                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -85,8 +95,8 @@ public class PetService extends Service
                 Gravity.TOP |
                         Gravity.START;
 
-        params.x = 60;
-        params.y = 500;
+        params.x = 40;
+        params.y = 550;
 
         windowManager.addView(
                 petView,
@@ -110,21 +120,28 @@ public class PetService extends Service
             int newSize =
                     sharedPreferences.getInt(
                             "pet_size",
-                            520
+                            340
                     );
 
             if (params != null &&
                     windowManager != null &&
                     petView != null) {
 
-                params.width = newSize;
-                params.height = newSize;
+                params.width =
+                        newSize;
+
+                params.height =
+                        (int) (
+                                newSize * 0.72f
+                        );
 
                 try {
+
                     windowManager.updateViewLayout(
                             petView,
                             params
                     );
+
                 } catch (Exception ignored) {
                 }
             }
@@ -149,6 +166,7 @@ public class PetService extends Service
                     );
 
             if (manager != null) {
+
                 manager.createNotificationChannel(
                         channel
                 );
@@ -161,16 +179,21 @@ public class PetService extends Service
         super.onDestroy();
 
         if (prefs != null) {
-            prefs.unregisterOnSharedPreferenceChangeListener(this);
+
+            prefs.unregisterOnSharedPreferenceChangeListener(
+                    this
+            );
         }
 
         if (windowManager != null &&
                 petView != null) {
 
             try {
+
                 windowManager.removeView(
                         petView
                 );
+
             } catch (Exception ignored) {
             }
         }
