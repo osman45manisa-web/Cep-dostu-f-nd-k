@@ -27,13 +27,6 @@ public class PetView extends View {
 
     private static final int FRAME_COUNT = 6;
 
-    /*
-     * Yürüyüş normal çizimden daha büyük.
-     * Tepki hareketleri yürüyüşten de büyük.
-     */
-    private static final float WALK_SCALE = 1.75f;
-    private static final float REACTION_SCALE = 2.35f;
-
     private final Paint paint =
             new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -118,8 +111,13 @@ public class PetView extends View {
             WindowManager manager,
             WindowManager.LayoutParams params
     ) {
+
         windowManager = manager;
         windowParams = params;
+    }
+
+    public boolean isReacting() {
+        return reacting;
     }
 
     private final Runnable animationLoop =
@@ -137,6 +135,8 @@ public class PetView extends View {
                 reacting = false;
                 state = State.WALK;
                 currentFrame = 0;
+
+                restoreWalkWindow();
             }
 
             currentFrame++;
@@ -242,15 +242,7 @@ public class PetView extends View {
             direction = 1;
         }
 
-        try {
-
-            windowManager.updateViewLayout(
-                    this,
-                    windowParams
-            );
-
-        } catch (Exception ignored) {
-        }
+        updateWindow();
     }
 
     private Bitmap getCurrentBitmap() {
@@ -309,50 +301,39 @@ public class PetView extends View {
                 );
 
         /*
-         * Önce görüntüyü pencereye sığdır.
+         * Köpek her zaman pencerenin
+         * TAMAMININ İÇİNDE kalır.
          */
-        float normalScale =
+        float availableWidth =
+                getWidth() * 0.94f;
+
+        float availableHeight =
+                getHeight() * 0.94f;
+
+        float scale =
                 Math.min(
-                        getWidth() /
-                                (float) frameWidth,
-                        getHeight() /
-                                (float) frameHeight
+                        availableWidth /
+                                frameWidth,
+                        availableHeight /
+                                frameHeight
                 );
-
-        /*
-         * Yürüme / tepki büyüklüğü.
-         */
-        float extraScale;
-
-        if (state == State.WALK) {
-            extraScale = WALK_SCALE;
-        } else {
-            extraScale = REACTION_SCALE;
-        }
-
-        float finalScale =
-                normalScale * extraScale;
 
         int drawWidth =
                 (int) (
                         frameWidth *
-                                finalScale
+                                scale
                 );
 
         int drawHeight =
                 (int) (
                         frameHeight *
-                                finalScale
+                                scale
                 );
 
         int drawLeft =
                 (getWidth() -
                         drawWidth) / 2;
 
-        /*
-         * Ayaklar mümkün olduğunca
-         * pencerenin altında kalsın.
-         */
         int drawTop =
                 getHeight() -
                         drawHeight;
@@ -368,8 +349,8 @@ public class PetView extends View {
         canvas.save();
 
         /*
-         * Yeni yürüyüş sprite'ı sola bakıyor.
-         * Sağa giderken aynala.
+         * Sprite sola bakıyor.
+         * Sağa giderken çevir.
          */
         if (direction > 0) {
 
@@ -406,6 +387,12 @@ public class PetView extends View {
         state = newState;
         currentFrame = 0;
 
+        /*
+         * Hareket başladığı anda
+         * pencereyi büyüt.
+         */
+        enlargeReactionWindow();
+
         reactionEndTime =
                 System.currentTimeMillis()
                         + duration;
@@ -413,9 +400,186 @@ public class PetView extends View {
         invalidate();
     }
 
+    private void enlargeReactionWindow() {
+
+        if (windowManager == null ||
+                windowParams == null) {
+            return;
+        }
+
+        int baseSize =
+                prefs.getInt(
+                        "pet_size",
+                        480
+                );
+
+        if (baseSize < 400) {
+            baseSize = 400;
+        }
+
+        /*
+         * Hareket sırasında yaklaşık
+         * %30 daha büyük.
+         */
+        int reactionWidth =
+                (int) (
+                        baseSize * 1.30f
+                );
+
+        int reactionHeight =
+                (int) (
+                        reactionWidth * 0.80f
+                );
+
+        int oldWidth =
+                windowParams.width;
+
+        int oldHeight =
+                windowParams.height;
+
+        /*
+         * Merkezi mümkün olduğunca
+         * aynı yerde tut.
+         */
+        windowParams.x -=
+                (reactionWidth -
+                        oldWidth) / 2;
+
+        windowParams.y -=
+                (reactionHeight -
+                        oldHeight) / 2;
+
+        windowParams.width =
+                reactionWidth;
+
+        windowParams.height =
+                reactionHeight;
+
+        keepInsideScreen();
+
+        updateWindow();
+    }
+
+    private void restoreWalkWindow() {
+
+        if (windowManager == null ||
+                windowParams == null) {
+            return;
+        }
+
+        int baseSize =
+                prefs.getInt(
+                        "pet_size",
+                        480
+                );
+
+        if (baseSize < 400) {
+            baseSize = 400;
+        }
+
+        int normalWidth =
+                baseSize;
+
+        int normalHeight =
+                (int) (
+                        baseSize * 0.80f
+                );
+
+        int oldWidth =
+                windowParams.width;
+
+        int oldHeight =
+                windowParams.height;
+
+        windowParams.x +=
+                (oldWidth -
+                        normalWidth) / 2;
+
+        windowParams.y +=
+                (oldHeight -
+                        normalHeight) / 2;
+
+        windowParams.width =
+                normalWidth;
+
+        windowParams.height =
+                normalHeight;
+
+        keepInsideScreen();
+
+        updateWindow();
+    }
+
+    private void keepInsideScreen() {
+
+        if (windowParams == null) {
+            return;
+        }
+
+        int screenWidth =
+                getResources()
+                        .getDisplayMetrics()
+                        .widthPixels;
+
+        int screenHeight =
+                getResources()
+                        .getDisplayMetrics()
+                        .heightPixels;
+
+        if (windowParams.x < 0) {
+            windowParams.x = 0;
+        }
+
+        if (windowParams.y < 0) {
+            windowParams.y = 0;
+        }
+
+        if (windowParams.x +
+                windowParams.width >
+                screenWidth) {
+
+            windowParams.x =
+                    Math.max(
+                            0,
+                            screenWidth -
+                                    windowParams.width
+                    );
+        }
+
+        if (windowParams.y +
+                windowParams.height >
+                screenHeight) {
+
+            windowParams.y =
+                    Math.max(
+                            0,
+                            screenHeight -
+                                    windowParams.height
+                    );
+        }
+    }
+
+    private void updateWindow() {
+
+        if (windowManager == null ||
+                windowParams == null) {
+            return;
+        }
+
+        try {
+
+            windowManager.updateViewLayout(
+                    this,
+                    windowParams
+            );
+
+        } catch (Exception ignored) {
+        }
+    }
+
     /*
-     * SÜRELER ÖNCEKİNİN
-     * YAKLAŞIK İKİ KATI
+     * Hareket süreleri öncekinin
+     * yaklaşık iki katı.
      */
 
     private void doLick() {
@@ -487,13 +651,15 @@ public class PetView extends View {
                         0f,
                         Math.min(
                                 1f,
-                                volumePercent / 100f
+                                volumePercent /
+                                        100f
                         )
                 );
 
         try {
 
             if (barkPlayer != null) {
+
                 barkPlayer.release();
                 barkPlayer = null;
             }
@@ -566,13 +732,8 @@ public class PetView extends View {
     ) {
 
         /*
-         * EN ÖNEMLİ DEĞİŞİKLİK:
-         *
-         * Hareket devam ederken bütün
-         * yeni dokunmaları tüketiyoruz.
-         * Hiçbiri hareketi kesemez,
-         * sürükleyemez veya başka
-         * animasyona geçiremez.
+         * Hareket sürerken hiçbir
+         * dokunma hareketi kesemez.
          */
         if (reacting) {
             return true;
@@ -580,7 +741,6 @@ public class PetView extends View {
 
         if (windowManager == null ||
                 windowParams == null) {
-
             return true;
         }
 
@@ -630,16 +790,8 @@ public class PetView extends View {
                             startY +
                                     (int) dy;
 
-                    try {
-
-                        windowManager
-                                .updateViewLayout(
-                                        this,
-                                        windowParams
-                                );
-
-                    } catch (Exception ignored) {
-                    }
+                    keepInsideScreen();
+                    updateWindow();
                 }
 
                 return true;
