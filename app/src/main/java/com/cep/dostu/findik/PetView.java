@@ -27,6 +27,13 @@ public class PetView extends View {
 
     private static final int FRAME_COUNT = 6;
 
+    /*
+     * Yürüyüş normal çizimden daha büyük.
+     * Tepki hareketleri yürüyüşten de büyük.
+     */
+    private static final float WALK_SCALE = 1.75f;
+    private static final float REACTION_SCALE = 2.35f;
+
     private final Paint paint =
             new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -158,19 +165,19 @@ public class PetView extends View {
         switch (state) {
 
             case PAW:
-                return 300;
+                return 430;
 
             case LICK:
-                return 230;
+                return 380;
 
             case SIT:
-                return 330;
+                return 480;
 
             case SPIN:
-                return 220;
+                return 360;
 
             case BARK:
-                return 190;
+                return 330;
 
             case WALK:
             default:
@@ -206,7 +213,6 @@ public class PetView extends View {
 
         if (windowManager == null ||
                 windowParams == null) {
-
             return;
         }
 
@@ -233,7 +239,6 @@ public class PetView extends View {
         if (windowParams.x <= 0) {
 
             windowParams.x = 0;
-
             direction = 1;
         }
 
@@ -299,12 +304,14 @@ public class PetView extends View {
                 new Rect(
                         sourceLeft,
                         0,
-                        sourceLeft +
-                                frameWidth,
+                        sourceLeft + frameWidth,
                         frameHeight
                 );
 
-        float scale =
+        /*
+         * Önce görüntüyü pencereye sığdır.
+         */
+        float normalScale =
                 Math.min(
                         getWidth() /
                                 (float) frameWidth,
@@ -312,22 +319,40 @@ public class PetView extends View {
                                 (float) frameHeight
                 );
 
+        /*
+         * Yürüme / tepki büyüklüğü.
+         */
+        float extraScale;
+
+        if (state == State.WALK) {
+            extraScale = WALK_SCALE;
+        } else {
+            extraScale = REACTION_SCALE;
+        }
+
+        float finalScale =
+                normalScale * extraScale;
+
         int drawWidth =
                 (int) (
                         frameWidth *
-                                scale
+                                finalScale
                 );
 
         int drawHeight =
                 (int) (
                         frameHeight *
-                                scale
+                                finalScale
                 );
 
         int drawLeft =
                 (getWidth() -
                         drawWidth) / 2;
 
+        /*
+         * Ayaklar mümkün olduğunca
+         * pencerenin altında kalsın.
+         */
         int drawTop =
                 getHeight() -
                         drawHeight;
@@ -336,16 +361,14 @@ public class PetView extends View {
                 new Rect(
                         drawLeft,
                         drawTop,
-                        drawLeft +
-                                drawWidth,
-                        drawTop +
-                                drawHeight
+                        drawLeft + drawWidth,
+                        drawTop + drawHeight
                 );
 
         canvas.save();
 
         /*
-         * Yeni sprite sola bakıyor.
+         * Yeni yürüyüş sprite'ı sola bakıyor.
          * Sağa giderken aynala.
          */
         if (direction > 0) {
@@ -377,8 +400,10 @@ public class PetView extends View {
             return;
         }
 
-        state = newState;
         reacting = true;
+        dragging = false;
+
+        state = newState;
         currentFrame = 0;
 
         reactionEndTime =
@@ -388,31 +413,40 @@ public class PetView extends View {
         invalidate();
     }
 
+    /*
+     * SÜRELER ÖNCEKİNİN
+     * YAKLAŞIK İKİ KATI
+     */
+
     private void doLick() {
+
         startReaction(
                 State.LICK,
-                1400
+                2800
         );
     }
 
     private void doPaw() {
+
         startReaction(
                 State.PAW,
-                1800
+                3600
         );
     }
 
     private void doSit() {
+
         startReaction(
                 State.SIT,
-                2000
+                4000
         );
     }
 
     private void doSpin() {
+
         startReaction(
                 State.SPIN,
-                1600
+                3200
         );
     }
 
@@ -424,7 +458,7 @@ public class PetView extends View {
 
         startReaction(
                 State.BARK,
-                1200
+                2400
         );
 
         playBarkSound();
@@ -460,7 +494,6 @@ public class PetView extends View {
         try {
 
             if (barkPlayer != null) {
-
                 barkPlayer.release();
                 barkPlayer = null;
             }
@@ -500,6 +533,9 @@ public class PetView extends View {
         float ny =
                 y / getHeight();
 
+        /*
+         * BAŞ
+         */
         if (ny < 0.45f &&
                 nx > 0.22f &&
                 nx < 0.78f) {
@@ -508,6 +544,9 @@ public class PetView extends View {
             return;
         }
 
+        /*
+         * PATİ
+         */
         if (ny > 0.60f &&
                 nx > 0.52f) {
 
@@ -515,6 +554,9 @@ public class PetView extends View {
             return;
         }
 
+        /*
+         * GÖVDE
+         */
         doSit();
     }
 
@@ -522,6 +564,19 @@ public class PetView extends View {
     public boolean onTouchEvent(
             MotionEvent event
     ) {
+
+        /*
+         * EN ÖNEMLİ DEĞİŞİKLİK:
+         *
+         * Hareket devam ederken bütün
+         * yeni dokunmaları tüketiyoruz.
+         * Hiçbiri hareketi kesemez,
+         * sürükleyemez veya başka
+         * animasyona geçiremez.
+         */
+        if (reacting) {
+            return true;
+        }
 
         if (windowManager == null ||
                 windowParams == null) {
@@ -597,8 +652,7 @@ public class PetView extends View {
                 long pressDuration =
                         now - downTime;
 
-                if (!dragging &&
-                        !reacting) {
+                if (!dragging) {
 
                     if (pressDuration >= 700) {
 
@@ -630,9 +684,9 @@ public class PetView extends View {
                                 () -> {
 
                                     if (
+                                            !reacting &&
                                             lastTapTime ==
-                                                    thisTap &&
-                                            !reacting
+                                                    thisTap
                                     ) {
 
                                         lastTapTime = 0;
