@@ -27,8 +27,12 @@ public class PetView extends View {
 
     private static final int FRAME_COUNT = 6;
 
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Paint paint =
+            new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private final Handler handler =
+            new Handler(Looper.getMainLooper());
+
     private final SharedPreferences prefs;
 
     private Bitmap walk;
@@ -57,6 +61,8 @@ public class PetView extends View {
 
     private boolean dragging = false;
     private boolean reacting = false;
+
+    private long reactionEndTime = 0;
 
     private MediaPlayer barkPlayer;
 
@@ -109,63 +115,102 @@ public class PetView extends View {
         windowParams = params;
     }
 
-    private final Runnable animationLoop = new Runnable() {
+    private final Runnable animationLoop =
+            new Runnable() {
+
         @Override
         public void run() {
+
+            long now =
+                    System.currentTimeMillis();
+
+            /*
+             * Tepki süresi bittiyse
+             * tekrar yürüyüşe dön.
+             */
+            if (reacting &&
+                    now >= reactionEndTime) {
+
+                reacting = false;
+                state = State.WALK;
+                currentFrame = 0;
+            }
 
             currentFrame++;
 
             if (currentFrame >= FRAME_COUNT) {
                 currentFrame = 0;
-
-                if (state != State.WALK) {
-                    state = State.WALK;
-                    reacting = false;
-                }
             }
 
-            if (state == State.WALK && !dragging) {
+            if (state == State.WALK &&
+                    !dragging) {
+
                 movePet();
             }
 
             invalidate();
 
-            long delay;
-
-            if (state == State.WALK) {
-                delay = getWalkDelay();
-            } else {
-                delay = 360;
-            }
-
-            handler.postDelayed(this, delay);
+            handler.postDelayed(
+                    this,
+                    getFrameDelay()
+            );
         }
     };
 
+    private long getFrameDelay() {
+
+        switch (state) {
+
+            case PAW:
+                return 300;
+
+            case LICK:
+                return 230;
+
+            case SIT:
+                return 330;
+
+            case SPIN:
+                return 220;
+
+            case BARK:
+                return 190;
+
+            case WALK:
+            default:
+                return getWalkDelay();
+        }
+    }
+
     private long getWalkDelay() {
 
-        int speed = prefs.getInt(
-                "walk_speed",
-                50
-        );
+        int speed =
+                prefs.getInt(
+                        "walk_speed",
+                        50
+                );
 
-        return 280 - (speed * 170L / 100L);
+        return 280 -
+                (speed * 170L / 100L);
     }
 
     private int getMoveStep() {
 
-        int speed = prefs.getInt(
-                "walk_speed",
-                50
-        );
+        int speed =
+                prefs.getInt(
+                        "walk_speed",
+                        50
+                );
 
-        return 2 + (speed * 7 / 100);
+        return 2 +
+                (speed * 7 / 100);
     }
 
     private void movePet() {
 
         if (windowManager == null ||
                 windowParams == null) {
+
             return;
         }
 
@@ -175,13 +220,16 @@ public class PetView extends View {
                         .widthPixels;
 
         windowParams.x +=
-                getMoveStep() * direction;
+                getMoveStep() *
+                        direction;
 
         if (windowParams.x +
-                windowParams.width >= screenWidth) {
+                windowParams.width >=
+                screenWidth) {
 
             windowParams.x =
-                    screenWidth - windowParams.width;
+                    screenWidth -
+                            windowParams.width;
 
             direction = -1;
         }
@@ -189,14 +237,17 @@ public class PetView extends View {
         if (windowParams.x <= 0) {
 
             windowParams.x = 0;
+
             direction = 1;
         }
 
         try {
+
             windowManager.updateViewLayout(
                     this,
                     windowParams
             );
+
         } catch (Exception ignored) {
         }
     }
@@ -252,14 +303,17 @@ public class PetView extends View {
                 new Rect(
                         sourceLeft,
                         0,
-                        sourceLeft + frameWidth,
+                        sourceLeft +
+                                frameWidth,
                         frameHeight
                 );
 
         float scale =
                 Math.min(
-                        getWidth() / (float) frameWidth,
-                        getHeight() / (float) frameHeight
+                        getWidth() /
+                                (float) frameWidth,
+                        getHeight() /
+                                (float) frameHeight
                 );
 
         int drawWidth =
@@ -286,14 +340,17 @@ public class PetView extends View {
                 new Rect(
                         drawLeft,
                         drawTop,
-                        drawLeft + drawWidth,
-                        drawTop + drawHeight
+                        drawLeft +
+                                drawWidth,
+                        drawTop +
+                                drawHeight
                 );
 
         canvas.save();
 
-        // Sprite sağa bakıyor kabul ediyoruz.
-        // Sola giderken aynala.
+        /*
+         * Sola giderken karakteri çevir.
+         */
         if (direction < 0) {
 
             canvas.scale(
@@ -314,18 +371,81 @@ public class PetView extends View {
         canvas.restore();
     }
 
-    private void startReaction(State newState) {
+    /*
+     * HAREKETLER
+     */
+
+    private void startReaction(
+            State newState,
+            long duration
+    ) {
 
         if (reacting) {
             return;
         }
 
-        reacting = true;
         state = newState;
+        reacting = true;
         currentFrame = 0;
+
+        reactionEndTime =
+                System.currentTimeMillis()
+                        + duration;
+
+        invalidate();
     }
 
-    private void playBark() {
+    private void doLick() {
+
+        startReaction(
+                State.LICK,
+                1400
+        );
+    }
+
+    private void doPaw() {
+
+        startReaction(
+                State.PAW,
+                1800
+        );
+    }
+
+    private void doSit() {
+
+        startReaction(
+                State.SIT,
+                2000
+        );
+    }
+
+    private void doSpin() {
+
+        startReaction(
+                State.SPIN,
+                1600
+        );
+    }
+
+    private void doBark() {
+
+        if (reacting) {
+            return;
+        }
+
+        startReaction(
+                State.BARK,
+                1200
+        );
+
+        playBarkSound();
+    }
+
+    /*
+     * HAVLAMA SESİ
+     */
+
+    private void playBarkSound() {
 
         boolean soundEnabled =
                 prefs.getBoolean(
@@ -355,6 +475,7 @@ public class PetView extends View {
         try {
 
             if (barkPlayer != null) {
+
                 barkPlayer.release();
                 barkPlayer = null;
             }
@@ -390,20 +511,14 @@ public class PetView extends View {
         }
     }
 
-    private void barkReaction() {
+    /*
+     * DOKUNMA BÖLGELERİ
+     */
 
-        if (reacting) {
-            return;
-        }
-
-        reacting = true;
-        state = State.BARK;
-        currentFrame = 0;
-
-        playBark();
-    }
-
-    private void handleTap(float x, float y) {
+    private void handleTap(
+            float x,
+            float y
+    ) {
 
         if (reacting) {
             return;
@@ -416,41 +531,33 @@ public class PetView extends View {
                 y / getHeight();
 
         /*
-         * BAŞ
-         * Üst orta bölge
+         * BAŞ:
+         * üst-orta bölge
          */
-        if (ny < 0.42f &&
-                nx > 0.25f &&
-                nx < 0.75f) {
+        if (ny < 0.45f &&
+                nx > 0.22f &&
+                nx < 0.78f) {
 
-            startReaction(
-                    State.LICK
-            );
-
+            doLick();
             return;
         }
 
         /*
-         * PATİ
-         * Alt sağ bölge
+         * PATİ:
+         * alt-ön bölüm
          */
         if (ny > 0.60f &&
                 nx > 0.52f) {
 
-            startReaction(
-                    State.PAW
-            );
-
+            doPaw();
             return;
         }
 
         /*
-         * GÖVDE
-         * Geri kalan alan
+         * GÖVDE:
+         * diğer bölgeler
          */
-        startReaction(
-                State.SIT
-        );
+        doSit();
     }
 
     @Override
@@ -497,8 +604,8 @@ public class PetView extends View {
                         event.getRawY() -
                                 downY;
 
-                if (Math.abs(dx) > 20 ||
-                        Math.abs(dy) > 20) {
+                if (Math.abs(dx) > 22 ||
+                        Math.abs(dy) > 22) {
 
                     dragging = true;
 
@@ -512,10 +619,11 @@ public class PetView extends View {
 
                     try {
 
-                        windowManager.updateViewLayout(
-                                this,
-                                windowParams
-                        );
+                        windowManager
+                                .updateViewLayout(
+                                        this,
+                                        windowParams
+                                );
 
                     } catch (Exception ignored) {
                     }
@@ -528,29 +636,44 @@ public class PetView extends View {
                 long now =
                         System.currentTimeMillis();
 
-                long duration =
+                long pressDuration =
                         now - downTime;
 
-                if (!dragging) {
+                if (!dragging &&
+                        !reacting) {
 
-                    if (duration > 700) {
+                    /*
+                     * UZUN BAS
+                     */
+                    if (pressDuration >= 700) {
 
-                        barkReaction();
+                        lastTapTime = 0;
+                        doBark();
 
-                    } else if (
+                    }
+
+                    /*
+                     * ÇİFT DOKUNMA
+                     */
+                    else if (
                             lastTapTime != 0 &&
-                            now - lastTapTime < 350
+                            now - lastTapTime <= 350
                     ) {
 
                         lastTapTime = 0;
+                        doSpin();
 
-                        startReaction(
-                                State.SPIN
-                        );
+                    }
 
-                    } else {
+                    /*
+                     * TEK DOKUNMA
+                     */
+                    else {
 
                         lastTapTime = now;
+
+                        final long thisTap =
+                                lastTapTime;
 
                         final float tapX =
                                 event.getX();
@@ -561,24 +684,21 @@ public class PetView extends View {
                         handler.postDelayed(
                                 () -> {
 
-                                    if (lastTapTime != 0) {
+                                    if (
+                                            lastTapTime ==
+                                                    thisTap &&
+                                            !reacting
+                                    ) {
 
-                                        long elapsed =
-                                                System.currentTimeMillis()
-                                                        - lastTapTime;
+                                        lastTapTime = 0;
 
-                                        if (elapsed >= 300) {
-
-                                            handleTap(
-                                                    tapX,
-                                                    tapY
-                                            );
-
-                                            lastTapTime = 0;
-                                        }
+                                        handleTap(
+                                                tapX,
+                                                tapY
+                                        );
                                     }
                                 },
-                                320
+                                380
                         );
                     }
                 }
