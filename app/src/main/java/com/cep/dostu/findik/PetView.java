@@ -124,10 +124,6 @@ public class PetView extends View {
             long now =
                     System.currentTimeMillis();
 
-            /*
-             * Tepki süresi bittiyse
-             * tekrar yürüyüşe dön.
-             */
             if (reacting &&
                     now >= reactionEndTime) {
 
@@ -349,9 +345,10 @@ public class PetView extends View {
         canvas.save();
 
         /*
-         * Sola giderken karakteri çevir.
+         * Yeni sprite sola bakıyor.
+         * Sağa giderken aynala.
          */
-        if (direction < 0) {
+        if (direction > 0) {
 
             canvas.scale(
                     -1f,
@@ -370,10 +367,6 @@ public class PetView extends View {
 
         canvas.restore();
     }
-
-    /*
-     * HAREKETLER
-     */
 
     private void startReaction(
             State newState,
@@ -396,7 +389,6 @@ public class PetView extends View {
     }
 
     private void doLick() {
-
         startReaction(
                 State.LICK,
                 1400
@@ -404,7 +396,6 @@ public class PetView extends View {
     }
 
     private void doPaw() {
-
         startReaction(
                 State.PAW,
                 1800
@@ -412,7 +403,6 @@ public class PetView extends View {
     }
 
     private void doSit() {
-
         startReaction(
                 State.SIT,
                 2000
@@ -420,7 +410,6 @@ public class PetView extends View {
     }
 
     private void doSpin() {
-
         startReaction(
                 State.SPIN,
                 1600
@@ -440,10 +429,6 @@ public class PetView extends View {
 
         playBarkSound();
     }
-
-    /*
-     * HAVLAMA SESİ
-     */
 
     private void playBarkSound() {
 
@@ -493,27 +478,12 @@ public class PetView extends View {
                         volume
                 );
 
-                barkPlayer.setOnCompletionListener(
-                        mp -> {
-
-                            mp.release();
-
-                            if (barkPlayer == mp) {
-                                barkPlayer = null;
-                            }
-                        }
-                );
-
                 barkPlayer.start();
             }
 
         } catch (Exception ignored) {
         }
     }
-
-    /*
-     * DOKUNMA BÖLGELERİ
-     */
 
     private void handleTap(
             float x,
@@ -530,10 +500,6 @@ public class PetView extends View {
         float ny =
                 y / getHeight();
 
-        /*
-         * BAŞ:
-         * üst-orta bölge
-         */
         if (ny < 0.45f &&
                 nx > 0.22f &&
                 nx < 0.78f) {
@@ -542,10 +508,6 @@ public class PetView extends View {
             return;
         }
 
-        /*
-         * PATİ:
-         * alt-ön bölüm
-         */
         if (ny > 0.60f &&
                 nx > 0.52f) {
 
@@ -553,10 +515,6 @@ public class PetView extends View {
             return;
         }
 
-        /*
-         * GÖVDE:
-         * diğer bölgeler
-         */
         doSit();
     }
 
@@ -642,20 +600,12 @@ public class PetView extends View {
                 if (!dragging &&
                         !reacting) {
 
-                    /*
-                     * UZUN BAS
-                     */
                     if (pressDuration >= 700) {
 
                         lastTapTime = 0;
                         doBark();
 
-                    }
-
-                    /*
-                     * ÇİFT DOKUNMA
-                     */
-                    else if (
+                    } else if (
                             lastTapTime != 0 &&
                             now - lastTapTime <= 350
                     ) {
@@ -663,12 +613,7 @@ public class PetView extends View {
                         lastTapTime = 0;
                         doSpin();
 
-                    }
-
-                    /*
-                     * TEK DOKUNMA
-                     */
-                    else {
+                    } else {
 
                         lastTapTime = now;
 
