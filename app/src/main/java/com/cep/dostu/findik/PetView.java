@@ -6,51 +6,104 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 
+import java.util.Random;
+
 public class PetView extends View {
+
+    private enum State {
+        WALK,
+        SIT,
+        PAW,
+        BARK,
+        LICK,
+        SPIN
+    }
 
     private static final int FRAME_COUNT = 6;
 
-    private final Bitmap sprite;
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Rect[] frameBounds = new Rect[FRAME_COUNT];
+    private final Paint paint =
+            new Paint(Paint.ANTI_ALIAS_FLAG);
+
+    private final Handler handler =
+            new Handler(Looper.getMainLooper());
+
+    private final Random random =
+            new Random();
+
+    private Bitmap walk;
+    private Bitmap sit;
+    private Bitmap paw;
+    private Bitmap bark;
+    private Bitmap lick;
+    private Bitmap spin;
+
+    private State state = State.WALK;
 
     private int currentFrame = 0;
-    private int direction = 1;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    // 1 = sağa, -1 = sola
+    private int direction = 1;
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams windowParams;
 
-    private float touchStartX;
-    private float touchStartY;
+    private float downRawX;
+    private float downRawY;
 
-    private int windowStartX;
-    private int windowStartY;
+    private int startWindowX;
+    private int startWindowY;
+
+    private long downTime;
 
     private boolean dragging = false;
+
+    private MediaPlayer barkPlayer;
 
     public PetView(Context context) {
         super(context);
 
-        setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        setBackgroundColor(
+                android.graphics.Color.TRANSPARENT
+        );
 
-        sprite = BitmapFactory.decodeResource(
+        walk = BitmapFactory.decodeResource(
                 getResources(),
                 R.drawable.findik_walk
         );
 
-        if (sprite != null) {
-            prepareFrameBounds();
-        }
+        sit = BitmapFactory.decodeResource(
+                getResources(),
+                R.drawable.findik_sit
+        );
 
-        handler.post(animationRunnable);
+        paw = BitmapFactory.decodeResource(
+                getResources(),
+                R.drawable.findik_paw
+        );
+
+        bark = BitmapFactory.decodeResource(
+                getResources(),
+                R.drawable.findik_bark
+        );
+
+        lick = BitmapFactory.decodeResource(
+                getResources(),
+                R.drawable.findik_lick
+        );
+
+        spin = BitmapFactory.decodeResource(
+                getResources(),
+                R.drawable.findik_spin
+        );
+
+        handler.post(animationLoop);
     }
 
     public void setWindowManager(
@@ -61,21 +114,30 @@ public class PetView extends View {
         windowParams = params;
     }
 
-    private final Runnable animationRunnable = new Runnable() {
+    private final Runnable animationLoop =
+            new Runnable() {
+
         @Override
         public void run() {
 
             currentFrame++;
 
             if (currentFrame >= FRAME_COUNT) {
+
                 currentFrame = 0;
+
+                if (state != State.WALK) {
+                    state = State.WALK;
+                }
             }
 
-            movePet();
+            if (state == State.WALK) {
+                movePet();
+            }
 
             invalidate();
 
-            handler.postDelayed(this, 130);
+            handler.postDelayed(this, 140);
         }
     };
 
@@ -92,85 +154,59 @@ public class PetView extends View {
                         .getDisplayMetrics()
                         .widthPixels;
 
-        int petWidth = windowParams.width;
+        windowParams.x +=
+                8 * direction;
 
-        windowParams.x += 10 * direction;
+        if (windowParams.x +
+                windowParams.width >= screenWidth) {
 
-        if (windowParams.x + petWidth >= screenWidth) {
-            windowParams.x = screenWidth - petWidth;
+            windowParams.x =
+                    screenWidth -
+                            windowParams.width;
+
             direction = -1;
         }
 
         if (windowParams.x <= 0) {
+
             windowParams.x = 0;
+
             direction = 1;
         }
 
         try {
+
             windowManager.updateViewLayout(
                     this,
                     windowParams
             );
+
         } catch (Exception ignored) {
         }
     }
 
-    private void prepareFrameBounds() {
+    private Bitmap getCurrentSprite() {
 
-        int cellWidth = sprite.getWidth() / FRAME_COUNT;
-        int imageHeight = sprite.getHeight();
+        switch (state) {
 
-        for (int frame = 0; frame < FRAME_COUNT; frame++) {
+            case SIT:
+                return sit;
 
-            int startX = frame * cellWidth;
+            case PAW:
+                return paw;
 
-            int minX = cellWidth;
-            int minY = imageHeight;
-            int maxX = 0;
-            int maxY = 0;
+            case BARK:
+                return bark;
 
-            for (int y = 0; y < imageHeight; y += 2) {
+            case LICK:
+                return lick;
 
-                for (int x = 0; x < cellWidth; x += 2) {
+            case SPIN:
+                return spin;
 
-                    int pixel = sprite.getPixel(
-                            startX + x,
-                            y
-                    );
-
-                    int alpha =
-                            android.graphics.Color.alpha(pixel);
-
-                    if (alpha > 20) {
-
-                        if (x < minX) minX = x;
-                        if (x > maxX) maxX = x;
-                        if (y < minY) minY = y;
-                        if (y > maxY) maxY = y;
-                    }
-                }
-            }
-
-            if (maxX <= minX || maxY <= minY) {
-
-                frameBounds[frame] =
-                        new Rect(
-                                startX,
-                                0,
-                                startX + cellWidth,
-                                imageHeight
-                        );
-
-            } else {
-
-                frameBounds[frame] =
-                        new Rect(
-                                startX + minX,
-                                minY,
-                                startX + maxX,
-                                maxY
-                        );
-            }
+            case WALK:
+            default:
+                return walk;
         }
     }
 
@@ -178,38 +214,55 @@ public class PetView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
+        Bitmap sprite =
+                getCurrentSprite();
+
         if (sprite == null) {
             return;
         }
 
-        Rect source = frameBounds[currentFrame];
+        int frameWidth =
+                sprite.getWidth() /
+                        FRAME_COUNT;
 
-        if (source == null) {
-            return;
-        }
+        int frameHeight =
+                sprite.getHeight();
 
-        float sourceWidth = source.width();
-        float sourceHeight = source.height();
+        int sourceLeft =
+                currentFrame *
+                        frameWidth;
 
-        float availableWidth = getWidth() - 30f;
-        float availableHeight = getHeight() - 30f;
+        Rect source =
+                new Rect(
+                        sourceLeft,
+                        0,
+                        sourceLeft + frameWidth,
+                        frameHeight
+                );
 
-        float scale = Math.min(
-                availableWidth / sourceWidth,
-                availableHeight / sourceHeight
-        );
+        float scale =
+                Math.min(
+                        (getWidth() - 20f)
+                                / frameWidth,
+
+                        (getHeight() - 20f)
+                                / frameHeight
+                );
 
         int drawWidth =
-                (int) (sourceWidth * scale);
+                (int) (frameWidth * scale);
 
         int drawHeight =
-                (int) (sourceHeight * scale);
+                (int) (frameHeight * scale);
 
         int left =
-                (getWidth() - drawWidth) / 2;
+                (getWidth() - drawWidth)
+                        / 2;
 
         int top =
-                getHeight() - drawHeight - 10;
+                getHeight()
+                        - drawHeight
+                        - 5;
 
         Rect destination =
                 new Rect(
@@ -221,7 +274,12 @@ public class PetView extends View {
 
         canvas.save();
 
-        if (direction < 0) {
+        /*
+         * Kaynak yürüyüş görseli sola bakıyor.
+         * Sağa giderken aynalıyoruz.
+         */
+        if (direction > 0) {
+
             canvas.scale(
                     -1f,
                     1f,
@@ -240,11 +298,57 @@ public class PetView extends View {
         canvas.restore();
     }
 
+    private void randomReaction() {
+
+        int choice =
+                random.nextInt(3);
+
+        if (choice == 0) {
+            state = State.PAW;
+        }
+
+        else if (choice == 1) {
+            state = State.LICK;
+        }
+
+        else {
+            state = State.SIT;
+        }
+
+        currentFrame = 0;
+    }
+
+    private void bark() {
+
+        state = State.BARK;
+        currentFrame = 0;
+
+        try {
+
+            if (barkPlayer != null) {
+                barkPlayer.release();
+            }
+
+            barkPlayer =
+                    MediaPlayer.create(
+                            getContext(),
+                            R.raw.findik_bark
+                    );
+
+            barkPlayer.start();
+
+        } catch (Exception ignored) {
+        }
+    }
+
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean onTouchEvent(
+            MotionEvent event
+    ) {
 
         if (windowManager == null ||
                 windowParams == null) {
+
             return true;
         }
 
@@ -252,47 +356,91 @@ public class PetView extends View {
 
             case MotionEvent.ACTION_DOWN:
 
-                dragging = true;
+                downRawX =
+                        event.getRawX();
 
-                touchStartX = event.getRawX();
-                touchStartY = event.getRawY();
+                downRawY =
+                        event.getRawY();
 
-                windowStartX = windowParams.x;
-                windowStartY = windowParams.y;
+                startWindowX =
+                        windowParams.x;
+
+                startWindowY =
+                        windowParams.y;
+
+                downTime =
+                        System.currentTimeMillis();
+
+                dragging = false;
 
                 return true;
 
             case MotionEvent.ACTION_MOVE:
 
                 float dx =
-                        event.getRawX() - touchStartX;
+                        event.getRawX()
+                                - downRawX;
 
                 float dy =
-                        event.getRawY() - touchStartY;
+                        event.getRawY()
+                                - downRawY;
 
-                windowParams.x =
-                        windowStartX + (int) dx;
+                if (Math.abs(dx) > 15 ||
+                        Math.abs(dy) > 15) {
 
-                windowParams.y =
-                        windowStartY + (int) dy;
+                    dragging = true;
 
-                try {
-                    windowManager.updateViewLayout(
-                            this,
-                            windowParams
-                    );
-                } catch (Exception ignored) {
+                    windowParams.x =
+                            startWindowX +
+                                    (int) dx;
+
+                    windowParams.y =
+                            startWindowY +
+                                    (int) dy;
+
+                    try {
+
+                        windowManager
+                                .updateViewLayout(
+                                        this,
+                                        windowParams
+                                );
+
+                    } catch (
+                            Exception ignored
+                    ) {
+                    }
                 }
 
                 return true;
 
             case MotionEvent.ACTION_UP:
 
-            case MotionEvent.ACTION_CANCEL:
+                long pressDuration =
+                        System.currentTimeMillis()
+                                - downTime;
+
+                if (!dragging) {
+
+                    if (pressDuration > 650) {
+
+                        bark();
+
+                    } else {
+
+                        randomReaction();
+                    }
+                }
 
                 dragging = false;
 
                 performClick();
+
+                return true;
+
+            case MotionEvent.ACTION_CANCEL:
+
+                dragging = false;
 
                 return true;
         }
@@ -311,7 +459,13 @@ public class PetView extends View {
         super.onDetachedFromWindow();
 
         handler.removeCallbacks(
-                animationRunnable
+                animationLoop
         );
+
+        if (barkPlayer != null) {
+
+            barkPlayer.release();
+            barkPlayer = null;
+        }
     }
 }
