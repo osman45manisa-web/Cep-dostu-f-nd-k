@@ -28,14 +28,9 @@ public class PetView extends View {
 
     private static final int FRAME_COUNT = 6;
 
-    private final Paint paint =
-            new Paint(Paint.ANTI_ALIAS_FLAG);
-
-    private final Handler handler =
-            new Handler(Looper.getMainLooper());
-
-    private final Random random =
-            new Random();
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Random random = new Random();
 
     private Bitmap walk;
     private Bitmap sit;
@@ -47,31 +42,26 @@ public class PetView extends View {
     private State state = State.WALK;
 
     private int currentFrame = 0;
-
-    // 1 = sağa, -1 = sola
     private int direction = 1;
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams windowParams;
 
-    private float downRawX;
-    private float downRawY;
+    private float downX;
+    private float downY;
 
-    private int startWindowX;
-    private int startWindowY;
+    private int startX;
+    private int startY;
 
     private long downTime;
 
     private boolean dragging = false;
+    private boolean reacting = false;
 
-    private MediaPlayer barkPlayer;
+    private MediaPlayer player;
 
     public PetView(Context context) {
         super(context);
-
-        setBackgroundColor(
-                android.graphics.Color.TRANSPARENT
-        );
 
         walk = BitmapFactory.decodeResource(
                 getResources(),
@@ -114,38 +104,42 @@ public class PetView extends View {
         windowParams = params;
     }
 
-    private final Runnable animationLoop =
-            new Runnable() {
-
+    private final Runnable animationLoop = new Runnable() {
         @Override
         public void run() {
 
             currentFrame++;
 
             if (currentFrame >= FRAME_COUNT) {
-
                 currentFrame = 0;
 
                 if (state != State.WALK) {
                     state = State.WALK;
+                    reacting = false;
                 }
             }
 
-            if (state == State.WALK) {
+            if (state == State.WALK && !dragging) {
                 movePet();
             }
 
             invalidate();
 
-            handler.postDelayed(this, 140);
+            long speed;
+
+            if (state == State.WALK) {
+                speed = 170;
+            } else {
+                speed = 260;
+            }
+
+            handler.postDelayed(this, speed);
         }
     };
 
     private void movePet() {
 
-        if (dragging ||
-                windowManager == null ||
-                windowParams == null) {
+        if (windowManager == null || windowParams == null) {
             return;
         }
 
@@ -154,56 +148,36 @@ public class PetView extends View {
                         .getDisplayMetrics()
                         .widthPixels;
 
-        windowParams.x +=
-                8 * direction;
+        windowParams.x += 6 * direction;
 
-        if (windowParams.x +
-                windowParams.width >= screenWidth) {
-
-            windowParams.x =
-                    screenWidth -
-                            windowParams.width;
-
+        if (windowParams.x + windowParams.width >= screenWidth) {
+            windowParams.x = screenWidth - windowParams.width;
             direction = -1;
         }
 
         if (windowParams.x <= 0) {
-
             windowParams.x = 0;
-
             direction = 1;
         }
 
         try {
-
-            windowManager.updateViewLayout(
-                    this,
-                    windowParams
-            );
-
+            windowManager.updateViewLayout(this, windowParams);
         } catch (Exception ignored) {
         }
     }
 
-    private Bitmap getCurrentSprite() {
-
+    private Bitmap currentBitmap() {
         switch (state) {
-
             case SIT:
                 return sit;
-
             case PAW:
                 return paw;
-
             case BARK:
                 return bark;
-
             case LICK:
                 return lick;
-
             case SPIN:
                 return spin;
-
             case WALK:
             default:
                 return walk;
@@ -214,39 +188,32 @@ public class PetView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        Bitmap sprite =
-                getCurrentSprite();
+        Bitmap sprite = currentBitmap();
 
         if (sprite == null) {
             return;
         }
 
         int frameWidth =
-                sprite.getWidth() /
-                        FRAME_COUNT;
+                sprite.getWidth() / FRAME_COUNT;
 
         int frameHeight =
                 sprite.getHeight();
 
-        int sourceLeft =
-                currentFrame *
-                        frameWidth;
+        int left =
+                currentFrame * frameWidth;
 
-        Rect source =
-                new Rect(
-                        sourceLeft,
-                        0,
-                        sourceLeft + frameWidth,
-                        frameHeight
-                );
+        Rect source = new Rect(
+                left,
+                0,
+                left + frameWidth,
+                frameHeight
+        );
 
         float scale =
                 Math.min(
-                        (getWidth() - 20f)
-                                / frameWidth,
-
-                        (getHeight() - 20f)
-                                / frameHeight
+                        getWidth() / (float) frameWidth,
+                        getHeight() / (float) frameHeight
                 );
 
         int drawWidth =
@@ -255,34 +222,25 @@ public class PetView extends View {
         int drawHeight =
                 (int) (frameHeight * scale);
 
-        int left =
-                (getWidth() - drawWidth)
-                        / 2;
+        int drawLeft =
+                (getWidth() - drawWidth) / 2;
 
-        int top =
-                getHeight()
-                        - drawHeight
-                        - 5;
+        int drawTop =
+                getHeight() - drawHeight;
 
-        Rect destination =
-                new Rect(
-                        left,
-                        top,
-                        left + drawWidth,
-                        top + drawHeight
-                );
+        Rect dest = new Rect(
+                drawLeft,
+                drawTop,
+                drawLeft + drawWidth,
+                drawTop + drawHeight
+        );
 
         canvas.save();
 
-        /*
-         * Kaynak yürüyüş görseli sola bakıyor.
-         * Sağa giderken aynalıyoruz.
-         */
         if (direction > 0) {
-
             canvas.scale(
-                    -1f,
-                    1f,
+                    -1,
+                    1,
                     getWidth() / 2f,
                     getHeight() / 2f
             );
@@ -291,64 +249,75 @@ public class PetView extends View {
         canvas.drawBitmap(
                 sprite,
                 source,
-                destination,
+                dest,
                 paint
         );
 
         canvas.restore();
     }
 
-    private void randomReaction() {
-
-        int choice =
-                random.nextInt(3);
-
-        if (choice == 0) {
-            state = State.PAW;
-        }
-
-        else if (choice == 1) {
-            state = State.LICK;
-        }
-
-        else {
-            state = State.SIT;
-        }
-
-        currentFrame = 0;
-    }
-
-    private void bark() {
-
-        state = State.BARK;
-        currentFrame = 0;
+    private void playSound(int soundRes) {
 
         try {
 
-            if (barkPlayer != null) {
-                barkPlayer.release();
+            if (player != null) {
+                player.release();
+                player = null;
             }
 
-            barkPlayer =
+            player =
                     MediaPlayer.create(
                             getContext(),
-                            R.raw.findik_bark
+                            soundRes
                     );
 
-            barkPlayer.start();
+            if (player != null) {
+                player.start();
+            }
 
         } catch (Exception ignored) {
         }
     }
 
+    private void shortReaction() {
+
+        if (reacting) {
+            return;
+        }
+
+        reacting = true;
+        currentFrame = 0;
+
+        int choice = random.nextInt(3);
+
+        if (choice == 0) {
+            state = State.PAW;
+        } else if (choice == 1) {
+            state = State.LICK;
+        } else {
+            state = State.SIT;
+        }
+
+        playSound(R.raw.findik_happy);
+    }
+
+    private void barkReaction() {
+
+        if (reacting) {
+            return;
+        }
+
+        reacting = true;
+        state = State.BARK;
+        currentFrame = 0;
+
+        playSound(R.raw.findik_bark);
+    }
+
     @Override
-    public boolean onTouchEvent(
-            MotionEvent event
-    ) {
+    public boolean onTouchEvent(MotionEvent event) {
 
-        if (windowManager == null ||
-                windowParams == null) {
-
+        if (windowManager == null || windowParams == null) {
             return true;
         }
 
@@ -356,20 +325,13 @@ public class PetView extends View {
 
             case MotionEvent.ACTION_DOWN:
 
-                downRawX =
-                        event.getRawX();
+                downX = event.getRawX();
+                downY = event.getRawY();
 
-                downRawY =
-                        event.getRawY();
+                startX = windowParams.x;
+                startY = windowParams.y;
 
-                startWindowX =
-                        windowParams.x;
-
-                startWindowY =
-                        windowParams.y;
-
-                downTime =
-                        System.currentTimeMillis();
+                downTime = System.currentTimeMillis();
 
                 dragging = false;
 
@@ -378,37 +340,28 @@ public class PetView extends View {
             case MotionEvent.ACTION_MOVE:
 
                 float dx =
-                        event.getRawX()
-                                - downRawX;
+                        event.getRawX() - downX;
 
                 float dy =
-                        event.getRawY()
-                                - downRawY;
+                        event.getRawY() - downY;
 
-                if (Math.abs(dx) > 15 ||
-                        Math.abs(dy) > 15) {
+                if (Math.abs(dx) > 18 ||
+                        Math.abs(dy) > 18) {
 
                     dragging = true;
 
                     windowParams.x =
-                            startWindowX +
-                                    (int) dx;
+                            startX + (int) dx;
 
                     windowParams.y =
-                            startWindowY +
-                                    (int) dy;
+                            startY + (int) dy;
 
                     try {
-
-                        windowManager
-                                .updateViewLayout(
-                                        this,
-                                        windowParams
-                                );
-
-                    } catch (
-                            Exception ignored
-                    ) {
+                        windowManager.updateViewLayout(
+                                this,
+                                windowParams
+                        );
+                    } catch (Exception ignored) {
                     }
                 }
 
@@ -416,32 +369,25 @@ public class PetView extends View {
 
             case MotionEvent.ACTION_UP:
 
-                long pressDuration =
-                        System.currentTimeMillis()
-                                - downTime;
+                long duration =
+                        System.currentTimeMillis() - downTime;
 
                 if (!dragging) {
 
-                    if (pressDuration > 650) {
-
-                        bark();
-
+                    if (duration > 650) {
+                        barkReaction();
                     } else {
-
-                        randomReaction();
+                        shortReaction();
                     }
                 }
 
                 dragging = false;
-
                 performClick();
 
                 return true;
 
             case MotionEvent.ACTION_CANCEL:
-
                 dragging = false;
-
                 return true;
         }
 
@@ -458,14 +404,11 @@ public class PetView extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
 
-        handler.removeCallbacks(
-                animationLoop
-        );
+        handler.removeCallbacks(animationLoop);
 
-        if (barkPlayer != null) {
-
-            barkPlayer.release();
-            barkPlayer = null;
+        if (player != null) {
+            player.release();
+            player = null;
         }
     }
 }
