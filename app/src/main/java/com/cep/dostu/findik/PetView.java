@@ -42,6 +42,17 @@ public class PetView extends View {
     private Bitmap lick;
     private Bitmap spin;
 
+    /*
+     * Her animasyondaki 6 karenin
+     * gerçek köpek sınırlarını saklar.
+     */
+    private Rect[] walkBounds;
+    private Rect[] sitBounds;
+    private Rect[] pawBounds;
+    private Rect[] barkBounds;
+    private Rect[] lickBounds;
+    private Rect[] spinBounds;
+
     private State state = State.WALK;
 
     private int currentFrame = 0;
@@ -104,6 +115,17 @@ public class PetView extends View {
                 R.drawable.findik_spin
         );
 
+        /*
+         * Uygulama açılırken her sprite'ın
+         * şeffaf boşluklarını bir kez hesapla.
+         */
+        walkBounds = calculateFrameBounds(walk);
+        sitBounds = calculateFrameBounds(sit);
+        pawBounds = calculateFrameBounds(paw);
+        barkBounds = calculateFrameBounds(bark);
+        lickBounds = calculateFrameBounds(lick);
+        spinBounds = calculateFrameBounds(spin);
+
         handler.post(animationLoop);
     }
 
@@ -118,6 +140,159 @@ public class PetView extends View {
 
     public boolean isReacting() {
         return reacting;
+    }
+
+    /*
+     * Bir sprite'ın 6 karesindeki
+     * gerçek görünür alanı bulur.
+     */
+    private Rect[] calculateFrameBounds(
+            Bitmap bitmap
+    ) {
+
+        Rect[] result =
+                new Rect[FRAME_COUNT];
+
+        if (bitmap == null) {
+            return result;
+        }
+
+        int frameWidth =
+                bitmap.getWidth() /
+                        FRAME_COUNT;
+
+        int frameHeight =
+                bitmap.getHeight();
+
+        for (int frame = 0;
+             frame < FRAME_COUNT;
+             frame++) {
+
+            int frameLeft =
+                    frame * frameWidth;
+
+            int minX = frameWidth;
+            int minY = frameHeight;
+
+            int maxX = -1;
+            int maxY = -1;
+
+            /*
+             * Performans için her piksel yerine
+             * ikişer piksel adımla tarıyoruz.
+             */
+            for (int y = 0;
+                 y < frameHeight;
+                 y += 2) {
+
+                for (int x = 0;
+                     x < frameWidth;
+                     x += 2) {
+
+                    int pixel =
+                            bitmap.getPixel(
+                                    frameLeft + x,
+                                    y
+                            );
+
+                    int alpha =
+                            (pixel >>> 24) & 0xff;
+
+                    /*
+                     * Çok hafif gölge / kenar
+                     * piksellerini boş kabul et.
+                     */
+                    if (alpha > 20) {
+
+                        if (x < minX) {
+                            minX = x;
+                        }
+
+                        if (x > maxX) {
+                            maxX = x;
+                        }
+
+                        if (y < minY) {
+                            minY = y;
+                        }
+
+                        if (y > maxY) {
+                            maxY = y;
+                        }
+                    }
+                }
+            }
+
+            /*
+             * Şeffaflık bulunamazsa
+             * tam kareyi kullan.
+             */
+            if (maxX < minX ||
+                    maxY < minY) {
+
+                result[frame] =
+                        new Rect(
+                                frameLeft,
+                                0,
+                                frameLeft +
+                                        frameWidth,
+                                frameHeight
+                        );
+
+                continue;
+            }
+
+            /*
+             * Köpeğin kenarlarının
+             * fazla sıkışmaması için
+             * küçük güvenlik payı.
+             */
+            int paddingX =
+                    Math.max(
+                            3,
+                            (maxX - minX) / 25
+                    );
+
+            int paddingY =
+                    Math.max(
+                            3,
+                            (maxY - minY) / 25
+                    );
+
+            minX =
+                    Math.max(
+                            0,
+                            minX - paddingX
+                    );
+
+            maxX =
+                    Math.min(
+                            frameWidth - 1,
+                            maxX + paddingX
+                    );
+
+            minY =
+                    Math.max(
+                            0,
+                            minY - paddingY
+                    );
+
+            maxY =
+                    Math.min(
+                            frameHeight - 1,
+                            maxY + paddingY
+                    );
+
+            result[frame] =
+                    new Rect(
+                            frameLeft + minX,
+                            minY,
+                            frameLeft + maxX + 1,
+                            maxY + 1
+                    );
+        }
+
+        return result;
     }
 
     private final Runnable animationLoop =
@@ -270,6 +445,31 @@ public class PetView extends View {
         }
     }
 
+    private Rect[] getCurrentBounds() {
+
+        switch (state) {
+
+            case SIT:
+                return sitBounds;
+
+            case PAW:
+                return pawBounds;
+
+            case BARK:
+                return barkBounds;
+
+            case LICK:
+                return lickBounds;
+
+            case SPIN:
+                return spinBounds;
+
+            case WALK:
+            default:
+                return walkBounds;
+        }
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -281,28 +481,62 @@ public class PetView extends View {
             return;
         }
 
-        int frameWidth =
-                sprite.getWidth() /
-                        FRAME_COUNT;
+        Rect[] bounds =
+                getCurrentBounds();
 
-        int frameHeight =
-                sprite.getHeight();
+        Rect source = null;
 
-        int sourceLeft =
-                currentFrame *
-                        frameWidth;
+        if (bounds != null &&
+                currentFrame >= 0 &&
+                currentFrame <
+                        bounds.length) {
 
-        Rect source =
-                new Rect(
-                        sourceLeft,
-                        0,
-                        sourceLeft + frameWidth,
-                        frameHeight
-                );
+            source =
+                    bounds[currentFrame];
+        }
 
         /*
-         * Köpek her zaman pencerenin
-         * TAMAMININ İÇİNDE kalır.
+         * Güvenlik:
+         * sınır hesabında problem olursa
+         * eski tam kare yöntemini kullan.
+         */
+        if (source == null) {
+
+            int frameWidth =
+                    sprite.getWidth() /
+                            FRAME_COUNT;
+
+            int sourceLeft =
+                    currentFrame *
+                            frameWidth;
+
+            source =
+                    new Rect(
+                            sourceLeft,
+                            0,
+                            sourceLeft +
+                                    frameWidth,
+                            sprite.getHeight()
+                    );
+        }
+
+        int dogWidth =
+                source.width();
+
+        int dogHeight =
+                source.height();
+
+        if (dogWidth <= 0 ||
+                dogHeight <= 0) {
+            return;
+        }
+
+        /*
+         * Artık boş sprite karesini değil,
+         * KÖPEĞİN KENDİSİNİ pencereye
+         * sığdırıyoruz.
+         *
+         * %94: pencerenin neredeyse tamamı.
          */
         float availableWidth =
                 getWidth() * 0.94f;
@@ -313,20 +547,20 @@ public class PetView extends View {
         float scale =
                 Math.min(
                         availableWidth /
-                                frameWidth,
+                                dogWidth,
                         availableHeight /
-                                frameHeight
+                                dogHeight
                 );
 
         int drawWidth =
                 (int) (
-                        frameWidth *
+                        dogWidth *
                                 scale
                 );
 
         int drawHeight =
                 (int) (
-                        frameHeight *
+                        dogHeight *
                                 scale
                 );
 
@@ -334,23 +568,36 @@ public class PetView extends View {
                 (getWidth() -
                         drawWidth) / 2;
 
+        /*
+         * Ayakları alta yakın tut.
+         */
+        int bottomMargin =
+                (int) (
+                        getHeight() *
+                                0.02f
+                );
+
         int drawTop =
                 getHeight() -
-                        drawHeight;
+                        drawHeight -
+                        bottomMargin;
 
         Rect destination =
                 new Rect(
                         drawLeft,
                         drawTop,
-                        drawLeft + drawWidth,
-                        drawTop + drawHeight
+                        drawLeft +
+                                drawWidth,
+                        drawTop +
+                                drawHeight
                 );
 
         canvas.save();
 
         /*
-         * Sprite sola bakıyor.
-         * Sağa giderken çevir.
+         * Yeni yürüyüş görselimiz
+         * sola bakıyor.
+         * Sağa giderken aynala.
          */
         if (direction > 0) {
 
@@ -388,8 +635,8 @@ public class PetView extends View {
         currentFrame = 0;
 
         /*
-         * Hareket başladığı anda
-         * pencereyi büyüt.
+         * Dokunma hareketine geçerken
+         * Fındık ayrıca yaklaşık %30 büyür.
          */
         enlargeReactionWindow();
 
@@ -417,18 +664,16 @@ public class PetView extends View {
             baseSize = 400;
         }
 
-        /*
-         * Hareket sırasında yaklaşık
-         * %30 daha büyük.
-         */
         int reactionWidth =
                 (int) (
-                        baseSize * 1.30f
+                        baseSize *
+                                1.30f
                 );
 
         int reactionHeight =
                 (int) (
-                        reactionWidth * 0.80f
+                        reactionWidth *
+                                0.80f
                 );
 
         int oldWidth =
@@ -437,10 +682,6 @@ public class PetView extends View {
         int oldHeight =
                 windowParams.height;
 
-        /*
-         * Merkezi mümkün olduğunca
-         * aynı yerde tut.
-         */
         windowParams.x -=
                 (reactionWidth -
                         oldWidth) / 2;
@@ -482,7 +723,8 @@ public class PetView extends View {
 
         int normalHeight =
                 (int) (
-                        baseSize * 0.80f
+                        baseSize *
+                                0.80f
                 );
 
         int oldWidth =
@@ -578,8 +820,7 @@ public class PetView extends View {
     }
 
     /*
-     * Hareket süreleri öncekinin
-     * yaklaşık iki katı.
+     * Hareket süreleri uzun tutuluyor.
      */
 
     private void doLick() {
@@ -732,8 +973,9 @@ public class PetView extends View {
     ) {
 
         /*
-         * Hareket sürerken hiçbir
-         * dokunma hareketi kesemez.
+         * Hareket sürerken dokunma,
+         * çift dokunma, uzun basma
+         * veya sürükleme hareketi KESMEZ.
          */
         if (reacting) {
             return true;
@@ -809,6 +1051,7 @@ public class PetView extends View {
                     if (pressDuration >= 700) {
 
                         lastTapTime = 0;
+
                         doBark();
 
                     } else if (
@@ -817,6 +1060,7 @@ public class PetView extends View {
                     ) {
 
                         lastTapTime = 0;
+
                         doSpin();
 
                     } else {
