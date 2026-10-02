@@ -48,6 +48,7 @@ public class PetView extends View {
 
     private float downX;
     private float downY;
+
     private int startX;
     private int startY;
 
@@ -57,7 +58,7 @@ public class PetView extends View {
     private boolean dragging = false;
     private boolean reacting = false;
 
-    private MediaPlayer player;
+    private MediaPlayer barkPlayer;
 
     public PetView(Context context) {
         super(context);
@@ -132,32 +133,39 @@ public class PetView extends View {
             long delay;
 
             if (state == State.WALK) {
-                delay = getWalkFrameDelay();
+                delay = getWalkDelay();
             } else {
-                delay = 320;
+                delay = 360;
             }
 
             handler.postDelayed(this, delay);
         }
     };
 
-    private long getWalkFrameDelay() {
+    private long getWalkDelay() {
 
-        int speed = prefs.getInt("walk_speed", 50);
+        int speed = prefs.getInt(
+                "walk_speed",
+                50
+        );
 
-        return 270 - (speed * 170L / 100L);
+        return 280 - (speed * 170L / 100L);
     }
 
     private int getMoveStep() {
 
-        int speed = prefs.getInt("walk_speed", 50);
+        int speed = prefs.getInt(
+                "walk_speed",
+                50
+        );
 
         return 2 + (speed * 7 / 100);
     }
 
     private void movePet() {
 
-        if (windowManager == null || windowParams == null) {
+        if (windowManager == null ||
+                windowParams == null) {
             return;
         }
 
@@ -166,9 +174,11 @@ public class PetView extends View {
                         .getDisplayMetrics()
                         .widthPixels;
 
-        windowParams.x += getMoveStep() * direction;
+        windowParams.x +=
+                getMoveStep() * direction;
 
-        if (windowParams.x + windowParams.width >= screenWidth) {
+        if (windowParams.x +
+                windowParams.width >= screenWidth) {
 
             windowParams.x =
                     screenWidth - windowParams.width;
@@ -191,7 +201,7 @@ public class PetView extends View {
         }
     }
 
-    private Bitmap currentBitmap() {
+    private Bitmap getCurrentBitmap() {
 
         switch (state) {
 
@@ -220,20 +230,23 @@ public class PetView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        Bitmap sprite = currentBitmap();
+        Bitmap sprite =
+                getCurrentBitmap();
 
         if (sprite == null) {
             return;
         }
 
         int frameWidth =
-                sprite.getWidth() / FRAME_COUNT;
+                sprite.getWidth() /
+                        FRAME_COUNT;
 
         int frameHeight =
                 sprite.getHeight();
 
         int sourceLeft =
-                currentFrame * frameWidth;
+                currentFrame *
+                        frameWidth;
 
         Rect source =
                 new Rect(
@@ -250,16 +263,24 @@ public class PetView extends View {
                 );
 
         int drawWidth =
-                (int) (frameWidth * scale);
+                (int) (
+                        frameWidth *
+                                scale
+                );
 
         int drawHeight =
-                (int) (frameHeight * scale);
+                (int) (
+                        frameHeight *
+                                scale
+                );
 
         int drawLeft =
-                (getWidth() - drawWidth) / 2;
+                (getWidth() -
+                        drawWidth) / 2;
 
         int drawTop =
-                getHeight() - drawHeight;
+                getHeight() -
+                        drawHeight;
 
         Rect destination =
                 new Rect(
@@ -271,10 +292,8 @@ public class PetView extends View {
 
         canvas.save();
 
-        /*
-         * Yön düzeltmesi.
-         * Sprite sağa bakıyorsa sola giderken aynala.
-         */
+        // Sprite sağa bakıyor kabul ediyoruz.
+        // Sola giderken aynala.
         if (direction < 0) {
 
             canvas.scale(
@@ -306,6 +325,71 @@ public class PetView extends View {
         currentFrame = 0;
     }
 
+    private void playBark() {
+
+        boolean soundEnabled =
+                prefs.getBoolean(
+                        "sound_enabled",
+                        true
+                );
+
+        if (!soundEnabled) {
+            return;
+        }
+
+        int volumePercent =
+                prefs.getInt(
+                        "sound_volume",
+                        80
+                );
+
+        float volume =
+                Math.max(
+                        0f,
+                        Math.min(
+                                1f,
+                                volumePercent / 100f
+                        )
+                );
+
+        try {
+
+            if (barkPlayer != null) {
+                barkPlayer.release();
+                barkPlayer = null;
+            }
+
+            barkPlayer =
+                    MediaPlayer.create(
+                            getContext(),
+                            R.raw.findik_bark
+                    );
+
+            if (barkPlayer != null) {
+
+                barkPlayer.setVolume(
+                        volume,
+                        volume
+                );
+
+                barkPlayer.setOnCompletionListener(
+                        mp -> {
+
+                            mp.release();
+
+                            if (barkPlayer == mp) {
+                                barkPlayer = null;
+                            }
+                        }
+                );
+
+                barkPlayer.start();
+            }
+
+        } catch (Exception ignored) {
+        }
+    }
+
     private void barkReaction() {
 
         if (reacting) {
@@ -319,93 +403,60 @@ public class PetView extends View {
         playBark();
     }
 
-    private void playBark() {
-
-        boolean enabled =
-                prefs.getBoolean(
-                        "sound_enabled",
-                        true
-                );
-
-        if (!enabled) {
-            return;
-        }
-
-        int volumePercent =
-                prefs.getInt(
-                        "sound_volume",
-                        80
-                );
-
-        float volume =
-                volumePercent / 100f;
-
-        try {
-
-            if (player != null) {
-                player.release();
-                player = null;
-            }
-
-            player = MediaPlayer.create(
-                    getContext(),
-                    R.raw.findik_bark
-            );
-
-            if (player != null) {
-
-                player.setVolume(
-                        volume,
-                        volume
-                );
-
-                player.start();
-            }
-
-        } catch (Exception ignored) {
-        }
-    }
-
     private void handleTap(float x, float y) {
 
         if (reacting) {
             return;
         }
 
-        float nx = x / getWidth();
-        float ny = y / getHeight();
+        float nx =
+                x / getWidth();
+
+        float ny =
+                y / getHeight();
 
         /*
-         * BAŞ BÖLGESİ
-         * üst orta
+         * BAŞ
+         * Üst orta bölge
          */
         if (ny < 0.42f &&
                 nx > 0.25f &&
                 nx < 0.75f) {
 
-            startReaction(State.LICK);
+            startReaction(
+                    State.LICK
+            );
+
             return;
         }
 
         /*
-         * ÖN PATİ BÖLGESİ
-         * alt ön taraf
+         * PATİ
+         * Alt sağ bölge
          */
-        if (ny > 0.62f &&
-                nx > 0.48f) {
+        if (ny > 0.60f &&
+                nx > 0.52f) {
 
-            startReaction(State.PAW);
+            startReaction(
+                    State.PAW
+            );
+
             return;
         }
 
         /*
          * GÖVDE
+         * Geri kalan alan
          */
-        startReaction(State.SIT);
+        startReaction(
+                State.SIT
+        );
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean onTouchEvent(
+            MotionEvent event
+    ) {
 
         if (windowManager == null ||
                 windowParams == null) {
@@ -417,11 +468,17 @@ public class PetView extends View {
 
             case MotionEvent.ACTION_DOWN:
 
-                downX = event.getRawX();
-                downY = event.getRawY();
+                downX =
+                        event.getRawX();
 
-                startX = windowParams.x;
-                startY = windowParams.y;
+                downY =
+                        event.getRawY();
+
+                startX =
+                        windowParams.x;
+
+                startY =
+                        windowParams.y;
 
                 downTime =
                         System.currentTimeMillis();
@@ -433,10 +490,12 @@ public class PetView extends View {
             case MotionEvent.ACTION_MOVE:
 
                 float dx =
-                        event.getRawX() - downX;
+                        event.getRawX() -
+                                downX;
 
                 float dy =
-                        event.getRawY() - downY;
+                        event.getRawY() -
+                                downY;
 
                 if (Math.abs(dx) > 20 ||
                         Math.abs(dy) > 20) {
@@ -444,16 +503,20 @@ public class PetView extends View {
                     dragging = true;
 
                     windowParams.x =
-                            startX + (int) dx;
+                            startX +
+                                    (int) dx;
 
                     windowParams.y =
-                            startY + (int) dy;
+                            startY +
+                                    (int) dy;
 
                     try {
+
                         windowManager.updateViewLayout(
                                 this,
                                 windowParams
                         );
+
                     } catch (Exception ignored) {
                     }
                 }
@@ -474,11 +537,16 @@ public class PetView extends View {
 
                         barkReaction();
 
-                    } else if (now - lastTapTime < 350) {
-
-                        startReaction(State.SPIN);
+                    } else if (
+                            lastTapTime != 0 &&
+                            now - lastTapTime < 350
+                    ) {
 
                         lastTapTime = 0;
+
+                        startReaction(
+                                State.SPIN
+                        );
 
                     } else {
 
@@ -493,16 +561,21 @@ public class PetView extends View {
                         handler.postDelayed(
                                 () -> {
 
-                                    if (lastTapTime != 0 &&
-                                            System.currentTimeMillis()
-                                                    - lastTapTime >= 300) {
+                                    if (lastTapTime != 0) {
 
-                                        handleTap(
-                                                tapX,
-                                                tapY
-                                        );
+                                        long elapsed =
+                                                System.currentTimeMillis()
+                                                        - lastTapTime;
 
-                                        lastTapTime = 0;
+                                        if (elapsed >= 300) {
+
+                                            handleTap(
+                                                    tapX,
+                                                    tapY
+                                            );
+
+                                            lastTapTime = 0;
+                                        }
                                     }
                                 },
                                 320
@@ -511,6 +584,7 @@ public class PetView extends View {
                 }
 
                 dragging = false;
+
                 performClick();
 
                 return true;
@@ -537,14 +611,14 @@ public class PetView extends View {
 
         handler.removeCallbacksAndMessages(null);
 
-        if (player != null) {
+        if (barkPlayer != null) {
 
             try {
-                player.release();
+                barkPlayer.release();
             } catch (Exception ignored) {
             }
 
-            player = null;
+            barkPlayer = null;
         }
     }
 }
